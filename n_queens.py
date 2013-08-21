@@ -1,5 +1,6 @@
 __author__ = 'brandon'
 
+import cProfile
 import threading
 import time
 import copy
@@ -28,6 +29,7 @@ class Agent(threading.Thread):
         self.network.add_agent(self)
         self.no_goods = {}
         self.board_s = board_size
+        self.settled = False
 
     def process_messages(self):
         m = self.messages.pop(0)
@@ -47,12 +49,8 @@ class Agent(threading.Thread):
         v = copy.copy(self.agent_view)
         t = max(self.agent_view)
         self.agent_view.pop(t)
-        self.send_no_good(str(t), v)
+        self.send_message(Agent.NO_GOOD, str(t), v)
         self.check_agent_view()
-
-    def send_no_good(self, t, v):
-        s = self.parents[t]
-        s.messages.append([self.id, Agent.NO_GOOD, v])
 
     def check_agent_view(self):
         if not self.consistent_check(self.assignment) or not self.check_no_goods(self.assignment):
@@ -96,10 +94,13 @@ class Agent(threading.Thread):
                 break
         return d
 
-    def send_message(self, va):
-        if va == Agent.OK_MESSAGE:
+    def send_message(self, value, parent=None, view=None):
+        if value == Agent.OK_MESSAGE:
             for i in self.successors:
                 i.messages.append([self.id, Agent.OK_MESSAGE, self.assignment])
+        elif value == Agent.NO_GOOD:
+            s = self.parents[parent]
+            s.messages.append([self.id, Agent.NO_GOOD, view])
 
     def n_queens(self, c, val):
         d = False
@@ -130,11 +131,9 @@ class Agent(threading.Thread):
                 self.check_agent_view()
                 if len(self.messages) == 0:
                     self.active = False
-                time.sleep(0.001)
             else:
                 if len(self.messages) > 0:
                     self.active = True
-                time.sleep(0.001)
 
 
 class Network:
@@ -152,7 +151,7 @@ class Network:
 
 def main():
     n = Network()
-    b = 5
+    b = 4
 
     agents = [Agent(n, b) for _ in range(b)]
 
@@ -165,12 +164,23 @@ def main():
     four = [[0, 1], [1, 3], [2, 0], [3, 2]]
     five = [[0, 0], [1, 2], [2, 4], [3, 1], [4, 3]]
 
-    while True:
+    s = True
+    while s:
         t = [i.assignment for i in agents]
-        if t == four or t == five:
-            break
         time.sleep(2)
         print t
+
+        c = True
+        for i in agents:
+            c = c and i.settled
+            if not c:
+                break
+        if c:
+            break
+
     print 'final', t
 
+
 main()
+
+#cProfile.run("main()")
